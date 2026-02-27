@@ -1,4 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+
+// ─── Email Server Config ──────────────────────────────────────────────────────
+// Change this to your deployed backend URL when in production
+// e.g. "https://your-server.railway.app"
+const EMAIL_API = "http://localhost:5000";
+// ─────────────────────────────────────────────────────────────────────────────
 
 const STEPS = ["Profile", "Resume", "Companies", "Send"];
 
@@ -466,7 +472,26 @@ export default function App() {
   const [emails, setEmails] = useState([]);
   const [emailLoading, setEmailLoading] = useState(false);
   const [sendStatus, setSendStatus] = useState({});
+  const [sendErrors, setSendErrors] = useState({});
   const [expandedEmail, setExpandedEmail] = useState(null);
+
+  // Server connectivity
+  const [serverStatus, setServerStatus] = useState("checking"); // "checking" | "online" | "offline"
+  const [serverSender, setServerSender] = useState("");
+
+  useEffect(() => {
+    const checkServer = async () => {
+      try {
+        const res = await fetch(`${EMAIL_API}/health`, { signal: AbortSignal.timeout(3000) });
+        const data = await res.json();
+        setServerStatus(data.gmail_configured ? "online" : "misconfigured");
+        setServerSender(data.sender || "");
+      } catch {
+        setServerStatus("offline");
+      }
+    };
+    checkServer();
+  }, []);
 
   // --- Profile handlers ---
   const toggleSkill = (skill) => {
@@ -601,17 +626,44 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
     setEmailLoading(false);
   };
 
-  const sendEmail = (idx) => {
+  const sendEmail = async (idx) => {
+    const em = emails[idx];
     setSendStatus(prev => ({ ...prev, [idx]: "sending" }));
-    setTimeout(() => {
-      setSendStatus(prev => ({ ...prev, [idx]: "sent" }));
-    }, 1500 + Math.random() * 800);
+    setSendErrors(prev => ({ ...prev, [idx]: null }));
+
+    try {
+      const res = await fetch(`${EMAIL_API}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to:        em.company.email,
+          subject:   em.subject,
+          body:      em.body,
+          from_name: profile.name || "ReachOut AI",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSendStatus(prev => ({ ...prev, [idx]: "sent" }));
+      } else {
+        setSendStatus(prev => ({ ...prev, [idx]: "error" }));
+        setSendErrors(prev => ({ ...prev, [idx]: data.error || "Unknown error" }));
+      }
+    } catch (err) {
+      setSendStatus(prev => ({ ...prev, [idx]: "error" }));
+      setSendErrors(prev => ({ ...prev, [idx]: "Could not reach email server. Is it running?" }));
+    }
   };
 
-  const sendAll = () => {
-    emails.forEach((_, i) => {
-      setTimeout(() => sendEmail(i), i * 600);
-    });
+  const sendAll = async () => {
+    for (let i = 0; i < emails.length; i++) {
+      if (sendStatus[i] !== "sent") {
+        await sendEmail(i);
+        await new Promise(r => setTimeout(r, 800)); // small delay between sends
+      }
+    }
   };
 
   const goNext = () => {
@@ -629,7 +681,7 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
       <div className="app">
         {/* HEADER */}
         <header className="header">
-          <div className="logo">REACH<span>OUT</span>.AI</div>
+          <div className="logo">RES<span>UGO</span></div>
           <div className="steps">
             {STEPS.map((s, i) => (
               <button
@@ -847,6 +899,51 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
               <div className="section-title">Send <span>Emails</span></div>
               <p className="section-sub">AI-crafted personalized cold emails — review & send</p>
 
+              {/* ── Server Status Banner ── */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: "0.8rem",
+                padding: "0.9rem 1.2rem",
+                background: serverStatus === "online" ? "#0a1a0a" : serverStatus === "offline" ? "#1a0808" : "#1a1200",
+                border: `1px solid ${serverStatus === "online" ? "#1a4a1a" : serverStatus === "offline" ? "#5a1a1a" : "#3a2a00"}`,
+                borderRadius: "5px", marginBottom: "1.5rem", fontSize: "0.82rem"
+              }}>
+                <span style={{ fontSize: "1.1rem" }}>
+                  {serverStatus === "online" ? "🟢" : serverStatus === "offline" ? "🔴" : serverStatus === "checking" ? "🟡" : "⚠️"}
+                </span>
+                <div style={{ flex: 1 }}>
+                  {serverStatus === "online" && (
+                    <span style={{ color: "#4caf50" }}>
+                      Email server connected — sending from <strong>{serverSender}</strong>
+                    </span>
+                  )}
+                  {serverStatus === "offline" && (
+                    <span style={{ color: "#ff6b6b" }}>
+                      Email server offline — run{" "}
+                      <code style={{ background: "#2a0808", padding: "0.15rem 0.5rem", borderRadius: "3px", fontFamily: "'DM Mono',monospace" }}>
+                        python email_server.py
+                      </code>{" "}
+                      in your terminal to enable real sending
+                    </span>
+                  )}
+                  {serverStatus === "misconfigured" && (
+                    <span style={{ color: "#ffb300" }}>
+                      Server running but Gmail not set up — add{" "}
+                      <code style={{ background: "#2a1a00", padding: "0.15rem 0.4rem", borderRadius: "3px", fontFamily: "'DM Mono',monospace" }}>GMAIL_ADDRESS</code>
+                      {" & "}
+                      <code style={{ background: "#2a1a00", padding: "0.15rem 0.4rem", borderRadius: "3px", fontFamily: "'DM Mono',monospace" }}>GMAIL_APP_PASSWORD</code>
+                      {" to your .env"}
+                    </span>
+                  )}
+                  {serverStatus === "checking" && <span style={{ color: "#ffb300" }}>Checking email server...</span>}
+                </div>
+                {serverStatus !== "online" && (
+                  <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer"
+                    style={{ color: "var(--orange)", fontSize: "0.72rem", fontFamily: "'DM Mono',monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
+                    Get App Password →
+                  </a>
+                )}
+              </div>
+
               {emails.length === 0 && !emailLoading && (
                 <div style={{ textAlign: "center", padding: "4rem 2rem" }}>
                   <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✉️</div>
@@ -897,15 +994,26 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                           {sendStatus[i] === "sent" && <span className="status-badge status-success">✓ Sent</span>}
                           {sendStatus[i] === "sending" && <span className="status-badge status-pending">⟳ Sending...</span>}
+                          {sendStatus[i] === "error" && <span className="status-badge status-error">✗ Failed</span>}
                           {!sendStatus[i] && (
                             <button className="btn btn-primary" style={{ padding: "0.4rem 1rem", fontSize: "0.72rem" }} onClick={e => { e.stopPropagation(); sendEmail(i); }}>
                               Send →
+                            </button>
+                          )}
+                          {sendStatus[i] === "error" && (
+                            <button className="btn btn-ghost" style={{ padding: "0.4rem 0.8rem", fontSize: "0.68rem" }} onClick={e => { e.stopPropagation(); sendEmail(i); }}>
+                              Retry
                             </button>
                           )}
                           <span style={{ color: "var(--muted)", fontSize: "0.9rem" }}>{expandedEmail === i ? "▲" : "▼"}</span>
                         </div>
                       </div>
                       {expandedEmail === i && <div className="email-body">{em.body}</div>}
+                      {sendErrors[i] && (
+                        <div style={{ padding: "0.7rem 1.4rem", background: "#1a0808", borderTop: "1px solid #4a1a1a", fontSize: "0.78rem", color: "#ff6b6b", fontFamily: "'DM Mono',monospace" }}>
+                          ⚠ {sendErrors[i]}
+                        </div>
+                      )}
                     </div>
                   ))}
 
