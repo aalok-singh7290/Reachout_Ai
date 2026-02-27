@@ -3,7 +3,9 @@ import { useState, useRef, useEffect } from "react";
 // ─── Email Server Config ──────────────────────────────────────────────────────
 // Change this to your deployed backend URL when in production
 // e.g. "https://your-server.railway.app"
-const EMAIL_API = "http://localhost:5000";
+// NOTE: We use port 5001 — port 5000 is blocked on Mac by AirPlay Receiver.
+// To use a different port, set the PORT env var in your .env and change this too.
+const EMAIL_API = "http://localhost:5001";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Generate a PDF from resume text and return base64 string ─────────────────
@@ -563,16 +565,25 @@ export default function App() {
 
   useEffect(() => {
     const checkServer = async () => {
+      setServerStatus("checking");
       try {
-        const res = await fetch(`${EMAIL_API}/health`, { signal: AbortSignal.timeout(3000) });
+        // Use a manual timeout instead of AbortSignal.timeout (not in all browsers)
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`${EMAIL_API}/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error("Non-200 response");
         const data = await res.json();
         setServerStatus(data.gmail_configured ? "online" : "misconfigured");
         setServerSender(data.sender || "");
-      } catch {
+      } catch (e) {
         setServerStatus("offline");
       }
     };
     checkServer();
+    // Re-check every 10 seconds so it updates automatically once server starts
+    const interval = setInterval(checkServer, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // --- Profile handlers ---
@@ -1016,11 +1027,11 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
                   )}
                   {serverStatus === "offline" && (
                     <span style={{ color: "#ff6b6b" }}>
-                      Email server offline — run{" "}
+                      Email server offline — open a <strong>new terminal</strong> and run:{" "}
                       <code style={{ background: "#2a0808", padding: "0.15rem 0.5rem", borderRadius: "3px", fontFamily: "'DM Mono',monospace" }}>
                         python email_server.py
-                      </code>{" "}
-                      in your terminal to enable real sending
+                      </code>
+                      <span style={{ color: "#888", marginLeft: "0.5rem" }}>(port 5001)</span>
                     </span>
                   )}
                   {serverStatus === "misconfigured" && (
@@ -1035,10 +1046,28 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
                   {serverStatus === "checking" && <span style={{ color: "#ffb300" }}>Checking email server...</span>}
                 </div>
                 {serverStatus !== "online" && (
-                  <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer"
-                    style={{ color: "var(--orange)", fontSize: "0.72rem", fontFamily: "'DM Mono',monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
-                    Get App Password →
-                  </a>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ padding: "0.3rem 0.8rem", fontSize: "0.7rem" }}
+                      onClick={async () => {
+                        setServerStatus("checking");
+                        try {
+                          const controller = new AbortController();
+                          const timer = setTimeout(() => controller.abort(), 4000);
+                          const res = await fetch(`${EMAIL_API}/health`, { signal: controller.signal });
+                          clearTimeout(timer);
+                          const data = await res.json();
+                          setServerStatus(data.gmail_configured ? "online" : "misconfigured");
+                          setServerSender(data.sender || "");
+                        } catch { setServerStatus("offline"); }
+                      }}
+                    >↺ Recheck</button>
+                    <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer"
+                      style={{ color: "var(--orange)", fontSize: "0.72rem", fontFamily: "'DM Mono',monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
+                      App Password →
+                    </a>
+                  </div>
                 )}
               </div>
 
