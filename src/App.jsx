@@ -1,0 +1,934 @@
+import { useState, useEffect, useRef } from "react";
+
+const STEPS = ["Profile", "Resume", "Companies", "Send"];
+
+const STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0a0a0a;
+    --white: #f5f0e8;
+    --cream: #f0ead8;
+    --orange: #ff5c00;
+    --orange-dim: #cc4900;
+    --gray: #2a2a2a;
+    --gray2: #1a1a1a;
+    --muted: #888;
+    --border: #2e2e2e;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 0.12em;
+    color: var(--white);
+  }
+  .logo span { color: var(--orange); }
+
+  .steps {
+    display: flex;
+    gap: 0;
+    background: var(--gray2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .step-btn {
+    padding: 0.5rem 1.2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .step-btn:last-child { border-right: none; }
+  .step-btn.active {
+    background: var(--orange);
+    color: var(--black);
+    font-weight: 600;
+  }
+  .step-btn.done { color: var(--white); }
+  .step-btn.done::after {
+    content: " ✓";
+    color: var(--orange);
+    font-size: 0.65rem;
+  }
+
+  /* MAIN */
+  .main {
+    flex: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 3rem 2rem;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    margin-bottom: 0.4rem;
+  }
+  .section-title span { color: var(--orange); }
+
+  .section-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 2.5rem;
+    font-weight: 300;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--gray2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 1rem;
+  }
+
+  /* INPUTS */
+  .input-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .input-group { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  input[type="text"], input[type="email"], input[type="url"], textarea, select {
+    background: var(--gray);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--white);
+    padding: 0.65rem 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--orange); }
+  input::placeholder, textarea::placeholder { color: #555; }
+  textarea { resize: vertical; min-height: 100px; }
+  select option { background: var(--gray); }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.6rem;
+    border: none;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+
+  .btn-primary {
+    background: var(--orange);
+    color: var(--black);
+  }
+  .btn-primary:hover { background: #ff7a33; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--white);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+
+  .btn-danger {
+    background: #2a1212;
+    color: #ff6b6b;
+    border: 1px solid #4a2020;
+  }
+  .btn-danger:hover { background: #3a1515; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* RESUME UPLOAD */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--gray2);
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--orange); background: #1a1000; }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+  .upload-text { color: var(--muted); font-size: 0.88rem; }
+  .upload-text strong { color: var(--white); }
+
+  /* RESUME EDITOR */
+  .resume-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .panel-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  .resume-text {
+    background: var(--gray);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.2rem;
+    height: 420px;
+    overflow-y: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    color: #ccc;
+  }
+
+  /* COMPANIES */
+  .company-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    background: var(--gray);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 0.6rem;
+    transition: border-color 0.2s;
+  }
+  .company-row:hover { border-color: var(--orange); }
+  .company-row.selected { border-color: var(--orange); background: #1a0e00; }
+  .company-check { width: 18px; height: 18px; accent-color: var(--orange); cursor: pointer; flex-shrink: 0; }
+  .company-name { font-weight: 500; font-size: 0.9rem; flex: 1; }
+  .company-role { font-size: 0.78rem; color: var(--muted); }
+  .company-badge {
+    padding: 0.2rem 0.6rem;
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  /* EMAIL PREVIEW */
+  .email-card {
+    background: var(--gray2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 1.2rem;
+    overflow: hidden;
+  }
+  .email-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.4rem;
+    background: var(--gray);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .email-to { font-weight: 500; font-size: 0.88rem; }
+  .email-company { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--orange); }
+  .email-body {
+    padding: 1.4rem;
+    font-size: 0.86rem;
+    line-height: 1.75;
+    color: #ccc;
+    white-space: pre-wrap;
+  }
+
+  /* TAGS */
+  .tag {
+    display: inline-block;
+    padding: 0.25rem 0.7rem;
+    background: #111;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin: 0.2rem;
+  }
+  .tag.selected { background: #1a0e00; border-color: var(--orange); color: var(--orange); cursor: pointer; }
+  .tag { cursor: pointer; transition: all 0.15s; }
+  .tag:hover { border-color: var(--orange); color: var(--orange); }
+
+  /* PROGRESS */
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* STATUS */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 3px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+  .status-success { background: #0a1a0a; border: 1px solid #1a4a1a; color: #4caf50; }
+  .status-pending { background: #1a1200; border: 1px solid #3a2a00; color: #ffb300; }
+  .status-error { background: #1a0a0a; border: 1px solid #4a1a1a; color: #f44336; }
+
+  /* AI LOADER */
+  .ai-pulse {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--orange);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+  }
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+  .dot { width: 6px; height: 6px; background: var(--orange); border-radius: 50%; animation: pulse 1.2s infinite; }
+  .dot:nth-child(2){animation-delay:0.2s}
+  .dot:nth-child(3){animation-delay:0.4s}
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  .nav-btns {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-box {
+    background: var(--gray2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    color: var(--orange);
+    line-height: 1;
+  }
+  .stat-label { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+
+  @media (max-width: 768px) {
+    .header { padding: 1rem; flex-wrap: wrap; gap: 1rem; }
+    .main { padding: 1.5rem 1rem; }
+    .grid-2, .resume-panel { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: 1fr 1fr; }
+    .input-row { flex-direction: column; }
+    .section-title { font-size: 2rem; }
+  }
+`;
+
+// Simulated AI resume modifier using Claude API
+async function callClaudeAPI(prompt, systemPrompt = "") {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: systemPrompt || "You are an expert resume writer and career coach.",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    return data.content?.[0]?.text || "";
+  } catch {
+    return null;
+  }
+}
+
+const SAMPLE_COMPANIES = [
+  { id: 1, name: "Google", hr: "Sarah Mitchell", email: "sarah.mitchell@google.com", role: "HR Manager – Engineering", industry: "Tech" },
+  { id: 2, name: "Microsoft", hr: "James Okonkwo", email: "james.okonkwo@microsoft.com", role: "Talent Acquisition Lead", industry: "Tech" },
+  { id: 3, name: "Flipkart", hr: "Priya Sharma", email: "priya.sharma@flipkart.com", role: "HR Business Partner", industry: "E-Commerce" },
+  { id: 4, name: "Swiggy", hr: "Rohan Mehta", email: "rohan.mehta@swiggy.in", role: "Recruiting Manager", industry: "Startup" },
+  { id: 5, name: "Infosys", hr: "Anita Rao", email: "anita.rao@infosys.com", role: "Campus Recruiter", industry: "IT Services" },
+  { id: 6, name: "Zomato", hr: "Kavya Nair", email: "kavya.nair@zomato.com", role: "Talent Partner", industry: "Startup" },
+  { id: 7, name: "Atlassian", hr: "Emma Chen", email: "emma.chen@atlassian.com", role: "Senior HR Manager", industry: "SaaS" },
+  { id: 8, name: "Razorpay", hr: "Vijay Bhat", email: "vijay.bhat@razorpay.com", role: "People Operations", industry: "Fintech" },
+];
+
+const SKILLS_POOL = ["Python", "React", "Node.js", "ML/AI", "Product Management", "Data Analysis", "DevOps", "UI/UX", "Java", "SQL", "Cloud", "Leadership"];
+
+export default function App() {
+  const [step, setStep] = useState(0);
+  const [done, setDone] = useState([]);
+
+  // Profile state
+  const [profile, setProfile] = useState({
+    name: "", email: "", linkedinUrl: "", instagramUrl: "",
+    role: "", skills: [], bio: "",
+  });
+  const [selectedSkills, setSelectedSkills] = useState([]);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileFetched, setProfileFetched] = useState(false);
+
+  // Resume state
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeText, setResumeText] = useState("");
+  const [modifiedResume, setModifiedResume] = useState("");
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [drag, setDrag] = useState(false);
+  const fileRef = useRef();
+
+  // Companies state
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [customCompany, setCustomCompany] = useState({ name: "", hr: "", email: "", role: "" });
+
+  // Email state
+  const [emails, setEmails] = useState([]);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [sendStatus, setSendStatus] = useState({});
+  const [expandedEmail, setExpandedEmail] = useState(null);
+
+  // --- Profile handlers ---
+  const toggleSkill = (skill) => {
+    setSelectedSkills(prev =>
+      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+    );
+  };
+
+  const fetchProfileData = async () => {
+    if (!profile.linkedinUrl && !profile.instagramUrl) return;
+    setProfileLoading(true);
+    const prompt = `Based on a LinkedIn profile at "${profile.linkedinUrl}" and Instagram at "${profile.instagramUrl}", generate a professional summary for someone who works as "${profile.role}". Skills: ${selectedSkills.join(", ")}. 
+    Return a concise 2-3 sentence professional bio that highlights their expertise and value proposition. Make it compelling for a job seeker.`;
+    const bio = await callClaudeAPI(prompt, "You extract and summarize professional profiles. Be concise and professional.");
+    setProfile(p => ({ ...p, bio: bio || "AI-powered professional with a passion for innovation and building impactful products. Experienced in cross-functional collaboration and delivering results at scale.", skills: selectedSkills }));
+    setProfileFetched(true);
+    setProfileLoading(false);
+  };
+
+  // --- Resume handlers ---
+  const handleFileDrop = (e) => {
+    e.preventDefault();
+    setDrag(false);
+    const file = e.dataTransfer?.files?.[0] || e.target?.files?.[0];
+    if (!file) return;
+    setResumeFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      setResumeText(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const modifyResume = async () => {
+    if (!resumeText && !profile.bio) return;
+    setResumeLoading(true);
+    const baseContent = resumeText || `Name: ${profile.name}\nRole: ${profile.role}\nSkills: ${selectedSkills.join(", ")}\n\nBio: ${profile.bio}`;
+    const prompt = `Rewrite and improve this resume to make it more compelling for modern tech/startup recruiters. 
+Profile context: Name: ${profile.name}, Target Role: ${profile.role}, Skills: ${selectedSkills.join(", ")}.
+LinkedIn insights: ${profile.linkedinUrl ? "Profile found at " + profile.linkedinUrl : "Not provided"}.
+
+Original resume content:
+${baseContent}
+
+Rewrite it with:
+1. A powerful summary section
+2. Clear, achievement-oriented bullet points with metrics
+3. ATS-friendly formatting
+4. Emphasis on skills: ${selectedSkills.join(", ")}
+
+Format as plain text resume.`;
+    const result = await callClaudeAPI(prompt, "You are an expert resume writer. Rewrite resumes to be compelling, ATS-friendly, and achievement-focused.");
+    setModifiedResume(result || generateFallbackResume());
+    setResumeLoading(false);
+  };
+
+  const generateFallbackResume = () => `${profile.name || "Your Name"}
+${profile.role || "Software Engineer"} | ${profile.email || "email@example.com"}
+LinkedIn: ${profile.linkedinUrl || ""}
+
+PROFESSIONAL SUMMARY
+${profile.bio || "Results-driven professional with expertise in " + selectedSkills.slice(0, 3).join(", ") + "."}
+
+CORE SKILLS
+${selectedSkills.join(" • ")}
+
+EXPERIENCE
+[Your work experience would be extracted from your uploaded resume and enhanced with AI-generated metrics and achievements]
+
+EDUCATION
+[Educational background enhanced with relevant coursework and projects]
+
+PROJECTS & ACHIEVEMENTS
+[Notable projects tailored to highlight skills: ${selectedSkills.slice(0, 2).join(", ")}]
+`;
+
+  // --- Companies ---
+  const toggleCompany = (id) => {
+    setSelectedCompanies(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const addCustomCompany = () => {
+    if (!customCompany.name) return;
+    const newCo = { ...customCompany, id: Date.now(), industry: "Custom" };
+    SAMPLE_COMPANIES.push(newCo);
+    setSelectedCompanies(prev => [...prev, newCo.id]);
+    setCustomCompany({ name: "", hr: "", email: "", role: "" });
+  };
+
+  // --- Email generation & send ---
+  const generateEmails = async () => {
+    setEmailLoading(true);
+    const companies = SAMPLE_COMPANIES.filter(c => selectedCompanies.includes(c.id));
+    const generated = [];
+
+    for (const co of companies) {
+      const prompt = `Write a concise, personalized cold email from a job seeker to an HR contact.
+
+Job seeker details:
+- Name: ${profile.name || "Alex Kumar"}
+- Target role: ${profile.role || "Software Engineer"}
+- Key skills: ${selectedSkills.join(", ")}
+- Bio: ${profile.bio || "Passionate software engineer with strong technical skills"}
+
+HR Contact:
+- Name: ${co.hr}
+- Company: ${co.name}
+- Role: ${co.role}
+- Industry: ${co.industry}
+
+Write a 3-paragraph cold email:
+1. Hook (why reaching out to this specific company)
+2. Value proposition (what makes this candidate unique)
+3. CTA (request for a 15-minute call)
+
+Keep it under 150 words. Be human, specific, not salesy.
+Start directly with "Hi ${co.hr.split(" ")[0]},"`;
+
+      const emailBody = await callClaudeAPI(prompt, "You write highly personalized, concise cold emails for job seekers. Be human and genuine, not corporate.");
+      generated.push({
+        company: co,
+        subject: `${profile.role || "Software Engineer"} – ${profile.name || "Interested Candidate"}`,
+        body: emailBody || `Hi ${co.hr.split(" ")[0]},\n\nI've been following ${co.name}'s work closely and would love to bring my expertise in ${selectedSkills.slice(0, 2).join(" and ")} to your team.\n\nWith a background in ${profile.role || "software development"}, I've consistently delivered measurable impact. I believe I can add significant value to ${co.name}'s engineering culture.\n\nWould you be open to a 15-minute chat? Happy to work around your schedule.\n\nBest,\n${profile.name || "Your Name"}`,
+        status: "ready",
+      });
+    }
+
+    setEmails(generated);
+    setEmailLoading(false);
+  };
+
+  const sendEmail = (idx) => {
+    setSendStatus(prev => ({ ...prev, [idx]: "sending" }));
+    setTimeout(() => {
+      setSendStatus(prev => ({ ...prev, [idx]: "sent" }));
+    }, 1500 + Math.random() * 800);
+  };
+
+  const sendAll = () => {
+    emails.forEach((_, i) => {
+      setTimeout(() => sendEmail(i), i * 600);
+    });
+  };
+
+  const goNext = () => {
+    setDone(prev => [...new Set([...prev, step])]);
+    setStep(s => s + 1);
+  };
+
+  const goBack = () => setStep(s => s - 1);
+
+  const sentCount = Object.values(sendStatus).filter(s => s === "sent").length;
+
+  return (
+    <>
+      <style>{STYLE}</style>
+      <div className="app">
+        {/* HEADER */}
+        <header className="header">
+          <div className="logo">REACH<span>OUT</span>.AI</div>
+          <div className="steps">
+            {STEPS.map((s, i) => (
+              <button
+                key={s}
+                className={`step-btn ${step === i ? "active" : ""} ${done.includes(i) ? "done" : ""}`}
+                onClick={() => { if (done.includes(i) || i <= step) setStep(i); }}
+              >
+                {i + 1}. {s}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "var(--muted)" }}>
+            {selectedCompanies.length > 0 && `${selectedCompanies.length} companies selected`}
+          </div>
+        </header>
+
+        <main className="main">
+
+          {/* ── STEP 0: PROFILE ── */}
+          {step === 0 && (
+            <>
+              <div className="section-title">Your <span>Profile</span></div>
+              <p className="section-sub">Connect your LinkedIn & Instagram to power AI personalization</p>
+
+              <div className="card">
+                <div className="card-label">Personal Details</div>
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Full Name</label>
+                    <input type="text" placeholder="Alex Kumar" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="input-group">
+                    <label>Email</label>
+                    <input type="email" placeholder="alex@email.com" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="input-group" style={{ marginBottom: "1rem" }}>
+                  <label>Target Role</label>
+                  <input type="text" placeholder="e.g. Senior Software Engineer, Product Manager" value={profile.role} onChange={e => setProfile(p => ({ ...p, role: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-label">Social Profiles</div>
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>🔗 LinkedIn URL</label>
+                    <input type="url" placeholder="https://linkedin.com/in/your-profile" value={profile.linkedinUrl} onChange={e => setProfile(p => ({ ...p, linkedinUrl: e.target.value }))} />
+                  </div>
+                  <div className="input-group">
+                    <label>📷 Instagram URL</label>
+                    <input type="url" placeholder="https://instagram.com/yourhandle" value={profile.instagramUrl} onChange={e => setProfile(p => ({ ...p, instagramUrl: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                  <button className="btn btn-ghost" onClick={fetchProfileData} disabled={profileLoading}>
+                    {profileLoading ? <span className="ai-pulse"><div className="dot"/><div className="dot"/><div className="dot"/>Fetching...</span> : "⚡ Fetch Profile Data"}
+                  </button>
+                </div>
+                {profileFetched && profile.bio && (
+                  <div style={{ marginTop: "1rem", padding: "1rem", background: "#0a0e00", border: "1px solid #1a3a00", borderRadius: "4px" }}>
+                    <div style={{ fontSize: "0.72rem", color: "#4caf50", fontFamily: "'DM Mono', monospace", marginBottom: "0.5rem" }}>✓ AI-Generated Bio</div>
+                    <p style={{ fontSize: "0.88rem", color: "#ccc", lineHeight: 1.6 }}>{profile.bio}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="card">
+                <div className="card-label">Skills & Expertise</div>
+                <p style={{ fontSize: "0.82rem", color: "var(--muted)", marginBottom: "1rem" }}>Select your top skills (AI will highlight these in your resume & emails)</p>
+                <div>{SKILLS_POOL.map(skill => (
+                  <span key={skill} className={`tag ${selectedSkills.includes(skill) ? "selected" : ""}`} onClick={() => toggleSkill(skill)}>{skill}</span>
+                ))}</div>
+                {selectedSkills.length > 0 && <p style={{ fontSize: "0.75rem", color: "var(--orange)", marginTop: "0.8rem" }}>{selectedSkills.length} skills selected</p>}
+              </div>
+
+              <div className="nav-btns">
+                <div />
+                <button className="btn btn-primary" onClick={goNext} disabled={!profile.name || !profile.email}>
+                  Next: Resume →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 1: RESUME ── */}
+          {step === 1 && (
+            <>
+              <div className="section-title">AI <span>Resume</span></div>
+              <p className="section-sub">Upload your resume — AI will tailor it using your profile & social data</p>
+
+              {!resumeText ? (
+                <div
+                  className={`upload-zone ${drag ? "drag" : ""}`}
+                  onDragOver={e => { e.preventDefault(); setDrag(true); }}
+                  onDragLeave={() => setDrag(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => fileRef.current.click()}
+                >
+                  <div className="upload-icon">📄</div>
+                  <p className="upload-text"><strong>Drop your resume here</strong> or click to upload</p>
+                  <p className="upload-text" style={{ marginTop: "0.3rem" }}>Supports .txt, .md files</p>
+                  <input ref={fileRef} type="file" accept=".txt,.md,.text" style={{ display: "none" }} onChange={handleFileDrop} />
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem", background: "#0a1a0a", border: "1px solid #1a4a1a", borderRadius: "4px", marginBottom: "1rem" }}>
+                  <span style={{ fontSize: "1.5rem" }}>✅</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500 }}>{resumeFile?.name || "Resume uploaded"}</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{resumeText.length} characters</div>
+                  </div>
+                  <button className="btn btn-danger" onClick={() => { setResumeText(""); setResumeFile(null); setModifiedResume(""); }}>Remove</button>
+                </div>
+              )}
+
+              <div className="card" style={{ marginTop: "1rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div className="card-label">AI Enhancement</div>
+                    <p style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
+                      {resumeText ? "AI will improve your uploaded resume" : "No resume? AI will generate one from your profile"}
+                    </p>
+                  </div>
+                  <button className="btn btn-primary" onClick={modifyResume} disabled={resumeLoading}>
+                    {resumeLoading ? <span className="ai-pulse"><div className="dot"/><div className="dot"/><div className="dot"/>Enhancing...</span> : "✨ Enhance with AI"}
+                  </button>
+                </div>
+
+                {modifiedResume && (
+                  <div className="resume-panel" style={{ marginTop: "1.5rem" }}>
+                    <div>
+                      <div className="panel-label">Original</div>
+                      <div className="resume-text">{resumeText || "(Generated from profile)"}</div>
+                    </div>
+                    <div>
+                      <div className="panel-label" style={{ color: "var(--orange)" }}>AI Enhanced ✨</div>
+                      <div className="resume-text" style={{ borderColor: "var(--orange)", color: "#ddd" }}>{modifiedResume}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="nav-btns">
+                <button className="btn btn-ghost" onClick={goBack}>← Back</button>
+                <button className="btn btn-primary" onClick={goNext} disabled={!modifiedResume && !resumeText}>
+                  Next: Companies →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 2: COMPANIES ── */}
+          {step === 2 && (
+            <>
+              <div className="section-title">Select <span>Companies</span></div>
+              <p className="section-sub">Choose which companies to target — AI will find HR contacts</p>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <span style={{ fontSize: "0.82rem", color: "var(--muted)" }}>{selectedCompanies.length} of {SAMPLE_COMPANIES.length} selected</span>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button className="btn btn-ghost" style={{ padding: "0.4rem 0.9rem", fontSize: "0.72rem" }} onClick={() => setSelectedCompanies(SAMPLE_COMPANIES.map(c => c.id))}>Select All</button>
+                  <button className="btn btn-ghost" style={{ padding: "0.4rem 0.9rem", fontSize: "0.72rem" }} onClick={() => setSelectedCompanies([])}>Clear</button>
+                </div>
+              </div>
+
+              {SAMPLE_COMPANIES.map(co => (
+                <div key={co.id} className={`company-row ${selectedCompanies.includes(co.id) ? "selected" : ""}`} onClick={() => toggleCompany(co.id)}>
+                  <input type="checkbox" className="company-check" checked={selectedCompanies.includes(co.id)} readOnly />
+                  <div style={{ flex: 1 }}>
+                    <div className="company-name">{co.name}</div>
+                    <div className="company-role">{co.hr} — {co.role}</div>
+                  </div>
+                  <span className="company-badge">{co.industry}</span>
+                  <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{co.email}</span>
+                </div>
+              ))}
+
+              <div className="card" style={{ marginTop: "1.5rem" }}>
+                <div className="card-label">Add Custom Company</div>
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Company Name</label>
+                    <input type="text" placeholder="Startup Inc." value={customCompany.name} onChange={e => setCustomCompany(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="input-group">
+                    <label>HR Name</label>
+                    <input type="text" placeholder="Jane Smith" value={customCompany.hr} onChange={e => setCustomCompany(p => ({ ...p, hr: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>HR Email</label>
+                    <input type="email" placeholder="hr@startup.com" value={customCompany.email} onChange={e => setCustomCompany(p => ({ ...p, email: e.target.value }))} />
+                  </div>
+                  <div className="input-group">
+                    <label>HR Role</label>
+                    <input type="text" placeholder="Talent Acquisition" value={customCompany.role} onChange={e => setCustomCompany(p => ({ ...p, role: e.target.value }))} />
+                  </div>
+                </div>
+                <button className="btn btn-ghost" onClick={addCustomCompany} disabled={!customCompany.name}>+ Add Company</button>
+              </div>
+
+              <div className="nav-btns">
+                <button className="btn btn-ghost" onClick={goBack}>← Back</button>
+                <button className="btn btn-primary" onClick={goNext} disabled={selectedCompanies.length === 0}>
+                  Generate Emails ({selectedCompanies.length}) →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 3: SEND ── */}
+          {step === 3 && (
+            <>
+              <div className="section-title">Send <span>Emails</span></div>
+              <p className="section-sub">AI-crafted personalized cold emails — review & send</p>
+
+              {emails.length === 0 && !emailLoading && (
+                <div style={{ textAlign: "center", padding: "4rem 2rem" }}>
+                  <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✉️</div>
+                  <p style={{ color: "var(--muted)", marginBottom: "1.5rem" }}>Click below to generate personalized emails for {selectedCompanies.length} companies</p>
+                  <button className="btn btn-primary" style={{ fontSize: "0.9rem", padding: "0.9rem 2rem" }} onClick={generateEmails}>
+                    ⚡ Generate All Emails
+                  </button>
+                </div>
+              )}
+
+              {emailLoading && (
+                <div style={{ textAlign: "center", padding: "4rem 2rem" }}>
+                  <span className="ai-pulse" style={{ justifyContent: "center", fontSize: "1rem" }}>
+                    <div className="dot"/><div className="dot"/><div className="dot"/>
+                    Writing personalized emails...
+                  </span>
+                  <div style={{ marginTop: "1.5rem", maxWidth: "300px", margin: "1.5rem auto 0" }}>
+                    <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginBottom: "0.5rem" }}>Processing {selectedCompanies.length} companies</div>
+                    <div className="progress-bar"><div className="progress-fill" style={{ width: "60%" }}/></div>
+                  </div>
+                </div>
+              )}
+
+              {emails.length > 0 && (
+                <>
+                  <div className="stat-row">
+                    <div className="stat-box"><div className="stat-val">{emails.length}</div><div className="stat-label">Emails Generated</div></div>
+                    <div className="stat-box"><div className="stat-val">{sentCount}</div><div className="stat-label">Sent</div></div>
+                    <div className="stat-box"><div className="stat-val">{emails.length - sentCount}</div><div className="stat-label">Pending</div></div>
+                    <div className="stat-box"><div className="stat-val">{emails.length > 0 ? Math.round((sentCount / emails.length) * 100) : 0}%</div><div className="stat-label">Progress</div></div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1.5rem" }}>
+                    <button className="btn btn-ghost" onClick={generateEmails}>↺ Regenerate</button>
+                    <button className="btn btn-primary" onClick={sendAll} disabled={sentCount === emails.length}>
+                      🚀 Send All ({emails.length - sentCount} remaining)
+                    </button>
+                  </div>
+
+                  {emails.map((em, i) => (
+                    <div key={i} className="email-card">
+                      <div className="email-header" onClick={() => setExpandedEmail(expandedEmail === i ? null : i)}>
+                        <div>
+                          <div className="email-company">{em.company.name}</div>
+                          <div className="email-to">To: {em.company.hr} &lt;{em.company.email}&gt;</div>
+                          <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: "0.2rem" }}>Subj: {em.subject}</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                          {sendStatus[i] === "sent" && <span className="status-badge status-success">✓ Sent</span>}
+                          {sendStatus[i] === "sending" && <span className="status-badge status-pending">⟳ Sending...</span>}
+                          {!sendStatus[i] && (
+                            <button className="btn btn-primary" style={{ padding: "0.4rem 1rem", fontSize: "0.72rem" }} onClick={e => { e.stopPropagation(); sendEmail(i); }}>
+                              Send →
+                            </button>
+                          )}
+                          <span style={{ color: "var(--muted)", fontSize: "0.9rem" }}>{expandedEmail === i ? "▲" : "▼"}</span>
+                        </div>
+                      </div>
+                      {expandedEmail === i && <div className="email-body">{em.body}</div>}
+                    </div>
+                  ))}
+
+                  {sentCount === emails.length && emails.length > 0 && (
+                    <div style={{ textAlign: "center", padding: "2rem", background: "#0a1a0a", border: "1px solid #1a4a1a", borderRadius: "6px", marginTop: "1.5rem" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
+                      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.8rem", color: "#4caf50" }}>All Emails Sent!</div>
+                      <p style={{ color: "var(--muted)", marginTop: "0.5rem", fontSize: "0.88rem" }}>
+                        {emails.length} personalized cold emails delivered. Check back in 48–72 hours for responses.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="nav-btns">
+                <button className="btn btn-ghost" onClick={goBack}>← Back</button>
+                <button className="btn btn-ghost" onClick={() => { setStep(0); setDone([]); setEmails([]); setSendStatus({}); }}>↺ Start Over</button>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+    </>
+  );
+}
