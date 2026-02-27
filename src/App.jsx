@@ -3,9 +3,9 @@ import { useState, useRef, useEffect } from "react";
 // ─── Email Server Config ──────────────────────────────────────────────────────
 // Change this to your deployed backend URL when in production
 // e.g. "https://your-server.railway.app"
-// NOTE: We use port 5001 — port 5000 is blocked on Mac by AirPlay Receiver.
-// To use a different port, set the PORT env var in your .env and change this too.
-const EMAIL_API = "http://localhost:5001";
+// On Vercel: the API is served from the same domain at /api/send_email
+// Locally:   run `python email_server.py` and set this to http://localhost:5001
+const EMAIL_API = "/api/send_email";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Generate a PDF from resume text and return base64 string ─────────────────
@@ -770,7 +770,7 @@ Start directly with "Hi ${co.hr.split(" ")[0]},"`;
     for (let i = 0; i < emails.length; i++) {
       if (sendStatus[i] !== "sent") {
         await sendEmail(i);
-        await new Promise(r => setTimeout(r, 800)); // small delay between sends
+        await new Promise(r => setTimeout(r, 600));
       }
     }
   };
